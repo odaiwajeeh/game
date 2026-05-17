@@ -589,7 +589,7 @@
         ladders: [],
         chanceBoxes: [],
         traps: [],
-        updatedAt: Date.now()
+        updatedAt: 0
       };
 
       var state = loadPlayerState();
@@ -598,6 +598,7 @@
       var firebaseRoomId = window.FIREBASE_ROOM_ID || "default-room";
       var playersRef = firebaseDb ? firebaseDb.ref("rooms/" + firebaseRoomId + "/playerState") : null;
       var applyingRemoteState = false;
+      var hasReceivedPlayerSnapshot = false;
 
       var els = {
         board: document.getElementById("board"),
@@ -621,7 +622,7 @@
           channel.addEventListener("message", function (event) {
             if (event.data && event.data.type === "players-state") {
               state = mergeState(clone(DEFAULT_PLAYER_STATE), clone(event.data.state));
-              normalizeState();
+              normalizeState(false);
               render();
             }
           });
@@ -635,15 +636,15 @@
         playersRef.on("value", function (snapshot) {
           var incoming = snapshot.val();
           if (!incoming) {
-            playersRef.set(state);
             return;
           }
-          if ((incoming.updatedAt || 0) < (state.updatedAt || 0)) {
+          if (hasReceivedPlayerSnapshot && (incoming.updatedAt || 0) <= (state.updatedAt || 0)) {
             return;
           }
+          hasReceivedPlayerSnapshot = true;
           applyingRemoteState = true;
           state = mergeState(clone(DEFAULT_PLAYER_STATE), clone(incoming));
-          normalizeState();
+          normalizeState(false);
           localStorage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(state));
           render();
           applyingRemoteState = false;
@@ -920,7 +921,7 @@
         });
       }
 
-      function normalizeState() {
+      function normalizeState(shouldSave) {
         state.players = Array.isArray(state.players) ? state.players : [];
         state.ladders = Array.isArray(state.ladders) ? state.ladders : [];
         state.chanceBoxes = Array.isArray(state.chanceBoxes) ? state.chanceBoxes : [];
@@ -956,7 +957,9 @@
           trap.cell = clamp(Number(trap.cell) || getRandomTrapCell(), 2, BOARD_SIZE - 1);
           trap.penalty = Number(trap.penalty) || getRandomPenalty();
         });
-        saveState();
+        if (shouldSave) {
+          saveState();
+        }
       }
 
       function loadPlayerState() {

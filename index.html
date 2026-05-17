@@ -938,14 +938,14 @@
         theme: "dark",
         timer: { seconds: 30, remaining: 30, running: false, endsAt: null },
         celebration: { id: 0, name: "" },
-        updatedAt: Date.now()
+        updatedAt: 0
       };
       var DEFAULT_PLAYER_STATE = {
         players: [],
         ladders: [],
         chanceBoxes: [],
         traps: [],
-        updatedAt: Date.now()
+        updatedAt: 0
       };
 
       var state = loadState();
@@ -957,6 +957,8 @@
       var gameRef = firebaseDb ? firebaseDb.ref("rooms/" + firebaseRoomId + "/gameState") : null;
       var playersRef = firebaseDb ? firebaseDb.ref("rooms/" + firebaseRoomId + "/playerState") : null;
       var applyingRemoteState = false;
+      var hasReceivedGameSnapshot = false;
+      var hasReceivedPlayerSnapshot = false;
       var timerInterval = null;
       var turnAdvanceTimer = null;
       var toastTimer = null;
@@ -1122,9 +1124,10 @@
             gameRef.set(state);
             return;
           }
-          if ((incoming.updatedAt || 0) <= (state.updatedAt || 0)) {
+          if (hasReceivedGameSnapshot && (incoming.updatedAt || 0) <= (state.updatedAt || 0)) {
             return;
           }
+          hasReceivedGameSnapshot = true;
           applyingRemoteState = true;
           state = mergeState(clone(DEFAULT_STATE), clone(incoming));
           normalizeState();
@@ -1140,9 +1143,10 @@
             playersRef.set(playerState);
             return;
           }
-          if ((incoming.updatedAt || 0) <= (playerState.updatedAt || 0)) {
+          if (hasReceivedPlayerSnapshot && (incoming.updatedAt || 0) <= (playerState.updatedAt || 0)) {
             return;
           }
+          hasReceivedPlayerSnapshot = true;
           applyingRemoteState = true;
           playerState = mergeState(clone(DEFAULT_PLAYER_STATE), clone(incoming));
           normalizePlayerState();
@@ -2172,7 +2176,9 @@
       }
 
       function saveState(shouldBroadcast) {
-        state.updatedAt = Date.now();
+        if (shouldBroadcast) {
+          state.updatedAt = Date.now();
+        }
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch (error) {
@@ -2189,7 +2195,9 @@
       }
 
       function savePlayerState(shouldBroadcast) {
-        playerState.updatedAt = Date.now();
+        if (shouldBroadcast) {
+          playerState.updatedAt = Date.now();
+        }
         try {
           localStorage.setItem(PLAYER_STORAGE_KEY, JSON.stringify(playerState));
         } catch (error) {
